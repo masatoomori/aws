@@ -83,12 +83,30 @@ def find_files_in_s3(s3_path, full_path=False):
     return files
 
 
-def read_df_from_s3(s3_path, encoding='utf8', dtype=object, quoting=csv.QUOTE_MINIMAL, delimiter=','):
+def read_df_from_s3_with_s3fs(s3_path, encoding='utf8', dtype=object, quoting=csv.QUOTE_MINIMAL, delimiter=','):
     fs = s3fs.S3FileSystem(key=S3_KEY, secret=S3_SECRET)
 
     with fs.open(s3_path) as f:
         df = pd.read_csv(f, encoding=encoding, dtype=dtype, quoting=quoting, delimiter=delimiter)
         return df
+
+
+def read_df_from_s3_with_cred(bucket, key, s3_access_key=None, s3_access_secret=None,
+                              encoding='utf8', dtype=object, delimiter=','):
+
+    if s3_access_key is None or s3_access_secret is None:
+        client = boto3.client('s3')
+    else:
+        client = boto3.client('s3', aws_access_key_id=s3_access_key, aws_secret_access_key=s3_access_secret)
+
+    try:
+        obj = client.get_object(Bucket=bucket, Key=key)
+        df = pd.read_csv(io.BytesIO(obj['Body'].read()), encoding=encoding, dtype=dtype, delimiter=delimiter)
+    except botocore.exceptions.ClientError as e:
+        print(e)
+        df = pd.DataFrame()
+
+    return df
 
 
 def read_df_from_s3_with_boto3(bucket, key, event=None, encoding='utf8', dtype=object, delimiter=','):
