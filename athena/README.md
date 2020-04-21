@@ -53,6 +53,7 @@ atn.save_result(ATHENA_BUCKET, ATHENA_BUCKET_PREFIX + '/view_result.csv')
 ```
 
 # クエリ
+[Athenaでデータ抽出するときによく使う関数まとめ](https://qiita.com/sh_tomato/items/97c33cea9bed5a23dd9e)も参考に
 
 ## 日付
 ### created_iso_dateが本日より１ヵ月以内
@@ -71,6 +72,11 @@ Expiration_Date >= CAST('2018-01-01' AS date)
 string1 || string2
 ```
 
+### 切出し
+```sql
+SUBSTR(string, <start pos (1 origin)>, <length>)
+```
+
 ### 大文字小文字
 ```sql
 UPPER(string1)
@@ -82,4 +88,9 @@ LOWER(string2)
 2つ以上の引数を取り、一番最初のNULLでない値を返す
 ```sql
 COALESCE(a, b)
+```
+
+## 型変換
+```sql
+CAST(string AS <data type>)
 ```
