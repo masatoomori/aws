@@ -71,6 +71,11 @@ Expiration_Date >= CAST('2018-01-01' AS date)
 string1 || string2
 ```
 
+### 切り出し
+```sql
+substr(string, start(note: 1 origin), length)
+```
+
 ### 大文字小文字
 ```sql
 UPPER(string1)
