@@ -1,12 +1,44 @@
 import time
 import datetime
 import io
-import pandas as pd
 from io import StringIO
 import re
+import os
 
+import pandas as pd
 import boto3
 
+
+# S3へのアクセス
+def get_aws_cred():
+    # 対象ファイルは credentials_\[ユーザ名\].csv となっていることを前提とする
+    if [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')]:
+        cred_file = [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')][0]
+        contents = open(cred_file, 'r').readlines()
+        """
+        Need credential with the following permissions
+        - AmazonAthenaFullAccess
+        - AmazonS3FullAccess
+
+        contentsの中身は下記のようになっているはず
+        ['User name,Password,Access key ID,Secret access key,Console login link\n',
+        'lambda_data-lake,<password>,<access key>,<access secret>,<login url>\n']
+        """
+        id_index = 2
+        secret_index = 3
+
+        cred = {
+            re.split(',', contents[0])[id_index]: re.split(',', contents[1])[id_index],
+            re.split(',', contents[0])[secret_index]: re.split(',', contents[1])[secret_index]
+        }
+    else:
+        cred = {
+            'Access key ID': None, 'Secret access key': None
+        }
+    return cred
+
+
+DEFAULT_CRED = get_aws_cred()
 DEFAULT_TIMEOUT_IN_SEC = 300
 DEFAULT_WAIT_IN_SEC = 1
 
@@ -24,9 +56,12 @@ class SingleResult:
 
     # cred is dict with access_key and access_secret as keys
     def __init__(self, db_region, db_name, bucket, prefix, cred=None):
-        if cred is not None:
-            self.aws_access_key = cred['access_key']
-            self.aws_access_secret = cred['access_secret']
+        if cred is None:
+            self.aws_access_key = DEFAULT_CRED['Access key ID']
+            self.aws_access_secret = DEFAULT_CRED['Secret access key']
+        else:
+            self.aws_access_key = cred['Access key ID']
+            self.aws_access_secret = cred['Secret access key']
 
         self.db_name = db_name
         self.result_bucket = bucket
