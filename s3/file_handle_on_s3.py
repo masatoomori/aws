@@ -5,8 +5,9 @@ import csv
 
 import pandas as pd
 import s3fs
-import boto3
 import botocore
+import boto3
+from boto3.session import Session
 
 
 # S3へのアクセス
@@ -34,6 +35,16 @@ S3_SECRET = CRED['Secret access key']
 BUCKET = '<bucket name>'
 BUCKET_KEY = '<path to file in a bucket>'
 FILE_NAME = '<file name>'
+
+
+def upload_file(source_file, destination_file, bucket_name):
+    session = Session(aws_access_key_id=S3_KEY,
+                      aws_secret_access_key=S3_SECRET)
+
+    s3 = session.resource('s3')
+
+    bucket = s3.Bucket(bucket_name)
+    bucket.upload_file(source_file, destination_file)
 
 
 def write_df_to_s3(df, s3_path, sep=','):

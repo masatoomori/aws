@@ -1,11 +1,44 @@
-import boto3
 import time
 import datetime
 import io
-import pandas as pd
 from io import StringIO
 import re
+import os
 
+import pandas as pd
+import boto3
+
+
+# S3へのアクセス
+def get_aws_cred():
+    # 対象ファイルは credentials_\[ユーザ名\].csv となっていることを前提とする
+    if [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')]:
+        cred_file = [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')][0]
+        contents = open(cred_file, 'r').readlines()
+        """
+        Need credential with the following permissions
+        - AmazonAthenaFullAccess
+        - AmazonS3FullAccess
+
+        contentsの中身は下記のようになっているはず
+        ['User name,Password,Access key ID,Secret access key,Console login link\n',
+        'lambda_data-lake,<password>,<access key>,<access secret>,<login url>\n']
+        """
+        id_index = 2
+        secret_index = 3
+
+        cred = {
+            re.split(',', contents[0])[id_index]: re.split(',', contents[1])[id_index],
+            re.split(',', contents[0])[secret_index]: re.split(',', contents[1])[secret_index]
+        }
+    else:
+        cred = {
+            'Access key ID': None, 'Secret access key': None
+        }
+    return cred
+
+
+DEFAULT_CRED = get_aws_cred()
 DEFAULT_TIMEOUT_IN_SEC = 300
 DEFAULT_WAIT_IN_SEC = 1
 
@@ -18,11 +51,28 @@ class SingleResult:
     last_query = None
     df_result = pd.DataFrame()
 
-    def __init__(self, db_region, db_name, bucket, prefix):
+    aws_access_key = None
+    aws_access_secret = None
+
+    # cred is dict with access_key and access_secret as keys
+    def __init__(self, db_region, db_name, bucket, prefix, cred=None):
+        if cred is None:
+            self.aws_access_key = DEFAULT_CRED['Access key ID']
+            self.aws_access_secret = DEFAULT_CRED['Secret access key']
+        else:
+            self.aws_access_key = cred['Access key ID']
+            self.aws_access_secret = cred['Secret access key']
+
         self.db_name = db_name
         self.result_bucket = bucket
         self.result_prefix = prefix
-        self.athena = boto3.client('athena', region_name=db_region)
+
+        if self.aws_access_key is None or self.aws_access_secret is None:
+            self.athena = boto3.client('athena', region_name=db_region)
+        else:
+            self.athena = boto3.client('athena', region_name=db_region,
+                                       aws_access_key_id=self.aws_access_key,
+                                       aws_secret_access_key=self.aws_access_secret)
 
     def __del__(self):
         print('deleting SimpleAthena instance...')
@@ -74,7 +124,11 @@ class SingleResult:
             time_elapsed = (datetime.datetime.now() - start_time).seconds
 
     def __delete_log(self, response_key):
-        s3 = boto3.resource('s3')
+        if self.aws_access_key is None or self.aws_access_secret is None:
+            s3 = boto3.resource('s3')
+        else:
+            s3 = boto3.resource('s3', aws_access_key_id=self.aws_access_key,
+                                aws_secret_access_key=self.aws_access_secret)
 
         start_time = datetime.datetime.now()
         time_elapsed = (datetime.datetime.now() - start_time).seconds
@@ -88,7 +142,11 @@ class SingleResult:
                 time_elapsed = (datetime.datetime.now() - start_time).seconds
 
     def __delete_result(self, response_key, and_metadata=False):
-        s3 = boto3.resource('s3')
+        if self.aws_access_key is None or self.aws_access_secret is None:
+            s3 = boto3.resource('s3')
+        else:
+            s3 = boto3.resource('s3', aws_access_key_id=self.aws_access_key,
+                                aws_secret_access_key=self.aws_access_secret)
 
         start_time = datetime.datetime.now()
         time_elapsed = (datetime.datetime.now() - start_time).seconds
@@ -167,7 +225,11 @@ class SingleResult:
 
             response_key = '/'.join([self.result_prefix, response['QueryExecutionId'] + '.csv'])
 
-            client = boto3.client('s3')
+            if self.aws_access_key is None or self.aws_access_secret is None:
+                client = boto3.client('s3')
+            else:
+                client = boto3.client('s3', aws_access_key_id=self.aws_access_key,
+                                      aws_secret_access_key=self.aws_access_secret)
             obj = client.get_object(Bucket=self.result_bucket, Key=response_key)
 
             self.df_result = pd.read_csv(io.BytesIO(obj['Body'].read()), encoding='utf8', dtype=object)
@@ -187,7 +249,11 @@ class SingleResult:
             return pd.DataFrame
 
     def read_key(self, bucket_key, encoding='utf8'):
-        client = boto3.client('s3')
+        if self.aws_access_key is None or self.aws_access_secret is None:
+            client = boto3.client('s3')
+        else:
+            client = boto3.client('s3', aws_access_key_id=self.aws_access_key,
+                                  aws_secret_access_key=self.aws_access_secret)
         obj = client.get_object(Bucket=self.result_bucket, Key=bucket_key)
 
         self.df_result = pd.read_csv(io.BytesIO(obj['Body'].read()), encoding=encoding, dtype=object)
@@ -211,51 +277,6 @@ class SingleResult:
 
         return self.read_sql(query, keep_result)
 
-    def download_table(self, query, keep_result=True):
-        print('WARNING: {f} method will be merged do {t} in the future'.format(f='download_table()', t='read_sql()'))
-
-        if query.upper().startswith('SELECT'):
-            output_bucket_key = 's3://{b}/{p}'.format(b=self.result_bucket, p=self.result_prefix)
-            self.last_query = query
-
-            response = self.athena.start_query_execution(
-                QueryString=query,
-                QueryExecutionContext={
-                    'Database': self.db_name
-                },
-                ResultConfiguration={
-                    'OutputLocation': output_bucket_key
-                }
-            )
-
-            self.__wait_for_execution_done(response)
-
-            response_key = '/'.join([self.result_prefix, response['QueryExecutionId'] + '.csv'])
-
-            client = boto3.client('s3')
-            obj = client.get_object(Bucket=self.result_bucket, Key=response_key)
-
-            self.df_result = pd.read_csv(io.BytesIO(obj['Body'].read()), encoding='utf8', dtype=object)
-
-            if keep_result:
-                self.response_keys.append(response_key)
-                self.response_keys.append(response_key + '.metadata')
-            else:
-                self.__delete_result(response_key, and_metadata=True)
-
-            return self.df_result
-        else:
-            print('query should starts with "SELECT"')
-            print('----------------------------------------')
-            print(query)
-            print('----------------------------------------')
-            return pd.DataFrame
-
-    def download_view(self, query, keep_result=True):
-        print('WARNING: {f} method will be merged do {t} in the future'.format(f='download_view()', t='read_sql()'))
-        self.last_query = query
-        return self.download_table(query, keep_result)
-
     def download_table_all(self, table, keep_result=True):
         query = 'select * from {}'.format(table)
         self.last_query = query
@@ -267,13 +288,18 @@ class SingleResult:
         return self.read_sql(query, keep_result)
 
     def save_result(self, dst_bucket, dst_key):
-        s3 = boto3.resource('s3')
+        if self.aws_access_key is None or self.aws_access_secret is None:
+            s3 = boto3.resource('s3')
+        else:
+            s3 = boto3.resource('s3', aws_access_key_id=self.aws_access_key,
+                                aws_secret_access_key=self.aws_access_secret)
 
         csv_buffer = StringIO()
         self.df_result.to_csv(csv_buffer)
 
         start_time = datetime.datetime.now()
         time_elapsed = (datetime.datetime.now() - start_time).seconds
+        res = None
         while time_elapsed < self.timeout_in_sec:
             res = s3.Object(dst_bucket, dst_key).put(Body=csv_buffer.getvalue())
 
