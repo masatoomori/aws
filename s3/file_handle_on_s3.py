@@ -1,17 +1,35 @@
-import pandas as pd
-import s3fs
-import boto3
-import botocore
+import os
 import io
 import re
 import csv
 
+import pandas as pd
+import s3fs
+import boto3
+import botocore
+
+
 # S3へのアクセス
-CREDENTIAL_FILE = 'credentials.csv'
-USER_NAME = 'AWS -> IAM -> Userで作成したユーザ名'
-CRED = pd.read_csv(CREDENTIAL_FILE, encoding='cp932', dtype=object, index_col='User name').to_dict()
-S3_KEY = CRED['Access key ID'][USER_NAME]
-S3_SECRET = CRED['Secret access key'][USER_NAME]
+def get_aws_cred():
+    # 対象ファイルは credentials_\[ユーザ名\].csv となっていることを前提とする
+    cred_file = [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')][0]
+    contents = open(cred_file, 'r').readlines()
+    """
+    contentsの中身は下記のようになっているはず
+    ['User name,Password,Access key ID,Secret access key,Console login link\n',
+     'lambda_data-lake,<password>,<access key>,<access secret>,<login url>\n']
+    """
+    id_index = 2
+    secret_index = 3
+
+    cred = {re.split(',', contents[0])[id_index]: re.split(',', contents[1])[id_index],
+            re.split(',', contents[0])[secret_index]: re.split(',', contents[1])[secret_index]}
+    return cred
+
+
+CRED = get_aws_cred()
+S3_KEY = CRED['Access key ID']
+S3_SECRET = CRED['Secret access key']
 
 BUCKET = '<bucket name>'
 BUCKET_KEY = '<path to file in a bucket>'
