@@ -1,13 +1,13 @@
-import pandas as pd
+import os
 import io
 import re
 import csv
-import os
 
+import pandas as pd
 import s3fs
+import botocore
 import boto3
 from boto3.session import Session
-import botocore
 
 
 # S3へのアクセス
