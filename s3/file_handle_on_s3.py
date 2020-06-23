@@ -47,9 +47,17 @@ def upload_file(source_file, destination_file, bucket_name):
     bucket.upload_file(source_file, destination_file)
 
 
-def write_df_to_s3(df, s3_path, sep=','):
+def write_df_to_s3_with_cred(df, bucket, key, sep=',', cred=None):
+    if cred is None:
+        s3_key = S3_KEY
+        s3_secret = S3_SECRET
+    else:
+        s3_key = CRED['Access key ID']
+        s3_secret = CRED['Secret access key']
+
+    s3_path = '/'.join([bucket, key])
     bytes_to_write = df.to_csv(None, sep=sep, index=False).encode()
-    fs = s3fs.S3FileSystem(key=S3_KEY, secret=S3_SECRET)
+    fs = s3fs.S3FileSystem(key=s3_key, secret=s3_secret)
 
     with fs.open(s3_path, 'wb') as f:
         f.write(bytes_to_write)
