@@ -177,8 +177,8 @@ def read_df_from_s3_with_boto3(bucket, key, event=None, encoding='utf8', dtype=o
 
 def test():
     data = pd.DataFrame()
-    s3_path = '/'.join(['s3:/', BUCKET, BUCKET_KEY, FILE_NAME])
-    write_df_to_s3(data, s3_path)
+    s3_key = '/'.join(['s3:/', BUCKET_KEY, FILE_NAME])
+    write_df_to_s3_with_boto3(data, BUCKET, s3_key)
 
 
 if __name__ == '__main__':
