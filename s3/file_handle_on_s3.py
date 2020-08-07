@@ -13,6 +13,10 @@ from boto3.session import Session
 # S3へのアクセス
 def get_aws_cred():
     # 対象ファイルは credentials_\[ユーザ名\].csv となっていることを前提とする
+
+    if len([f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')]) == 0:
+        return {'Access key ID': None, 'Secret access key': None}
+
     cred_file = [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')][0]
     contents = open(cred_file, 'r').readlines()
     """
@@ -38,8 +42,7 @@ FILE_NAME = '<file name>'
 
 
 def upload_file(source_file, destination_file, bucket_name):
-    session = Session(aws_access_key_id=S3_KEY,
-                      aws_secret_access_key=S3_SECRET)
+    session = Session(aws_access_key_id=S3_KEY, aws_secret_access_key=S3_SECRET)
 
     s3 = session.resource('s3')
 
@@ -52,8 +55,18 @@ def write_df_to_s3_with_cred(df, bucket, key, sep=',', cred=None):
         s3_key = S3_KEY
         s3_secret = S3_SECRET
     else:
-        s3_key = CRED['Access key ID']
-        s3_secret = CRED['Secret access key']
+        if 'Access key ID' in cred:
+            s3_key = cred['Access key ID']
+        elif 'access_key' in cred:
+            s3_key = cred['access_key']
+        else:
+            s3_key = S3_KEY
+        if 'Secret access key' in cred:
+            s3_secret = cred['Secret access key']
+        elif 'access_secret' in cred:
+            s3_secret = cred['access_secret']
+        else:
+            s3_secret = S3_SECRET
 
     s3_path = '/'.join([bucket, key])
     bytes_to_write = df.to_csv(None, sep=sep, index=False).encode()
