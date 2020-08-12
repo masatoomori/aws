@@ -12,6 +12,7 @@ import boto3
 # S3へのアクセス
 def get_aws_cred():
     # 対象ファイルは credentials_\[ユーザ名\].csv となっていることを前提とする
+    # cred ファイルが存在しなければ Key, Secret ともに None である cred を返す
     if [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')]:
         cred_file = [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')][0]
         contents = open(cred_file, 'r').readlines()
@@ -51,17 +52,14 @@ class SingleResult:
     last_query = None
     df_result = pd.DataFrame()
 
-    aws_access_key = None
-    aws_access_secret = None
+    aws_access_key = DEFAULT_CRED['Access key ID']
+    aws_access_secret = DEFAULT_CRED['Secret access key']
 
     # cred is dict with access_key and access_secret as keys
-    def __init__(self, db_region, db_name, bucket, prefix, cred=None):
-        if cred is None:
-            self.aws_access_key = DEFAULT_CRED['Access key ID']
-            self.aws_access_secret = DEFAULT_CRED['Secret access key']
-        else:
-            self.aws_access_key = cred['Access key ID']
-            self.aws_access_secret = cred['Secret access key']
+    def __init__(self, db_region, db_name, bucket, prefix, cred=None, cred_key_col='Access key ID', cred_secret_col='Secret access key'):
+        if cred is not None:
+            self.aws_access_key = cred[cred_key_col]
+            self.aws_access_secret = cred[cred_secret_col]
 
         self.db_name = db_name
         self.result_bucket = bucket
@@ -207,6 +205,9 @@ class SingleResult:
             return None
 
     def read_sql(self, query, keep_result=True):
+        # query から不要な行（空行とコメントから始まる行）を取り除く
+        query = '\n'.join([q.strip() for q in re.split('\n', query) if q != '' and not q.startswith('--')])
+
         if query.upper().startswith('SELECT'):
             output_bucket_key = 's3://{b}/{p}'.format(b=self.result_bucket, p=self.result_prefix)
             self.last_query = query
