@@ -33,6 +33,7 @@ def get_aws_cred():
             re.split(',', contents[0])[secret_index]: re.split(',', contents[1])[secret_index]
         }
     else:
+        print("No cred file in csv format starting with 'credentials_' in {}".format(os.curdir))
         cred = {
             'Access key ID': None, 'Secret access key': None
         }
@@ -204,7 +205,7 @@ class SingleResult:
             print('----------------------------------------')
             return None
 
-    def read_sql(self, query, keep_result=True):
+    def read_sql(self, query, keep_result=False):
         # query から不要な行（空行とコメントから始まる行）を取り除く
         query = '\n'.join([q.strip() for q in re.split('\n', query) if q != '' and not q.startswith('--')])
 
