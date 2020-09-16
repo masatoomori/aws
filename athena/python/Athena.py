@@ -215,7 +215,7 @@ class SingleResult:
             print('----------------------------------------')
             return None
 
-    def read_sql(self, query, keep_result=True):
+    def read_sql(self, query, keep_result=False):
         # query から不要な行（空行とコメントから始まる行）を取り除く
         query = '\n'.join([q.strip() for q in re.split('\n', query) if q != '' and not q.startswith('--')])
 
