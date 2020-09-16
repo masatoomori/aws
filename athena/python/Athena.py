@@ -10,33 +10,44 @@ import boto3
 
 
 # S3へのアクセス
-def get_aws_cred():
-    # 対象ファイルは credentials_\[ユーザ名\].csv となっていることを前提とする
+def get_aws_cred(word_in_file=None):
+    # 対象ファイルは credentials_ から始まる csv となっていることを前提とする
     # cred ファイルが存在しなければ Key, Secret ともに None である cred を返す
-    if [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')]:
-        cred_file = [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')][0]
-        contents = open(cred_file, 'r').readlines()
-        """
-        Need credential with the following permissions
-        - AmazonAthenaFullAccess
-        - AmazonS3FullAccess
+    # 複数ファイルがあった場合、 word_in_file がファイル名にあるものを優先する
+    # それも複数あった場合、任意の1つを選ぶ
 
-        contentsの中身は下記のようになっているはず
-        ['User name,Password,Access key ID,Secret access key,Console login link\n',
-        'lambda_data-lake,<password>,<access key>,<access secret>,<login url>\n']
-        """
-        id_index = 2
-        secret_index = 3
+    cred_files = [f for f in os.listdir(os.curdir) if f.startswith('credentials_') and f.endswith('.csv')]
 
-        cred = {
-            re.split(',', contents[0])[id_index]: re.split(',', contents[1])[id_index],
-            re.split(',', contents[0])[secret_index]: re.split(',', contents[1])[secret_index]
-        }
-    else:
-        cred = {
+    if not cred_files:
+        return {
             'Access key ID': None, 'Secret access key': None
         }
-    return cred
+
+    cred_file = cred_files[0]
+    if word_in_file is not None:
+        cred_files_with_word = [f for f in cred_files if word_in_file in f]
+        if cred_files_with_word:
+            cred_file = cred_files_with_word[0]
+
+    contents = open(cred_file, 'r').readlines()
+    contents = [c.strip() for c in contents]
+    """
+    Need credential with the following permissions
+    - AmazonAthenaFullAccess
+    - AmazonS3FullAccess
+
+    """
+    content = dict(zip(re.split(',', contents[0]), re.split(',', contents[1])))
+
+    if 'Access key ID' in content and 'Secret access key' in content:
+        return {
+            'Access key ID': content['Access key ID'],
+            'Secret access key': content['Secret access key']
+        }
+
+    return {
+        'Access key ID': None, 'Secret access key': None
+    }
 
 
 DEFAULT_CRED = get_aws_cred()
