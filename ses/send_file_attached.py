@@ -1,10 +1,11 @@
 # 実行ユーザ（IAMなどで指定）にSESへのアクセス権があることを確認すること
 
-import boto3
 import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
+
+import boto3
 
 SES_PROFILE_FILE = 'ses_profile.json'
 SES_PROFILE_NAME = "SES_PROFILE_FILEにある誰か"

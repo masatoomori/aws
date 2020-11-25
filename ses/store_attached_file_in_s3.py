@@ -1,9 +1,8 @@
 import email
-import boto3
-import re
-import pandas as pd
-import datetime
 import io
+
+import boto3
+import pandas as pd
 
 BUCKET = '<S3 bucket to store>'
 KEY = '<S3 key to store>'

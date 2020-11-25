@@ -3,7 +3,7 @@ import email
 import boto3
 import urllib
 import re
-import function_to_receive
+import function_to_receive  # メールを処理する関数を定義した任意のスクリプト
 
 RECEIVER = 'receiver email address'
 
@@ -22,7 +22,7 @@ def get_email_address(msg_object, pos):
     emails = list()
     if accounts is not None:
         for account in accounts:
-            parsed_accounts = [a for a in re.split('[,\t\r\n\s]', account)
+            parsed_accounts = [a for a in re.split('[,\t\r\n ]', account)
                                if '@' in a and not a.startswith('@') and not a.endswith('@')]
             for parsed_account in parsed_accounts:
                 emails.append(re.sub(r'[<>"]', '', parsed_account).lower())

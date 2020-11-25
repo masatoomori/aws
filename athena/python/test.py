@@ -21,6 +21,5 @@ def main():
     df_2 = atn.read_sql(QUERY, keep_result=False)
 
 
-
 if __name__ == '__main__':
     main()
